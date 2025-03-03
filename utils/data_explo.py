@@ -19,14 +19,15 @@ def freq_distribution(
         ) -> pd.Series:
     """
     Affichage du graphique (historigramme) de la distribution des fréquences des
-    valeurs fournies dans 
+    valeurs fournies dans la série, et retourne la distribution sous forme de 
     Args :
-        len_serie (pd.Series) :
+        len_serie (pd.Series) : séries de chaînes de caractères
         xlabel
         ylabel
         title
         palette
-
+    Returns :
+        (pd.Series) distribution des longueurs des chaines de carctères
     """
     # Calculer la longueur des chaînes de caractères dans la colonne "nom"
     lengths = serie.apply(len)
@@ -65,6 +66,7 @@ def freq_char(serie: pd.Series) -> None:
     char_freq_df = pd.DataFrame(
         char_counts.items(), columns=['Caractère', 'Fréquence']
         ).sort_values(by='Fréquence', ascending=False)
+    char_freq_df["Ratio Freq (%)"] = char_freq_df["Fréquence"] / char_freq_df["Fréquence"].sum() * 100
 
     print("Nombre de caractères distincts :", len(char_freq_df))
 
@@ -115,7 +117,7 @@ def rate_freq_by_position(
     sns.heatmap(position_char_rate_df, annot=True, fmt=".2f", cmap="coolwarm", cbar=True)
     plt.xlabel('Position')
     plt.ylabel('Caractère')
-    plt.title('Taux de présence des caractères par position (limité aux trunc_length premières positions)')
+    plt.title(f'Taux de présence des caractères par position (limité aux {trunc_length} premières positions)')
     plt.yticks(rotation=0)
     plt.show()
 
@@ -123,7 +125,9 @@ def rate_freq_by_position(
 Default_Element_Separator = "-' "
 def freq_composition_element(
         serie: pd.Series,
-        element_separator: str = Default_Element_Separator
+        element_separator: str = Default_Element_Separator,
+        n_e: int = 15,
+        n_p: int = 15
         ) -> None:
     all_elements = ' '.join(serie.str.replace(f"[{element_separator}]", " ", regex=True).values).split()
 
@@ -137,14 +141,16 @@ def freq_composition_element(
         ).sort_values(by='Fréquence', ascending=False)
 
     print(f"Nombre total de composants distincts : {len(element_freq_df)}")
-    display(element_freq_df.sample(15).sort_values(by='Fréquence', ascending=False))
+    print(f"dont {n_e} exemples :")
+    display(element_freq_df.sample(n_e).sort_values(by='Fréquence', ascending=False))
 
-    # Filtrer les éléments dont la fréquence est supérieure à 1
+    # Filtrer les éléments dont la fréquence est strictement supérieure à 1
     element_freq_sup_1_df = element_freq_df[element_freq_df['Fréquence'] > 1]
 
     # Afficher le nombre total d'éléments associés
     print(f"Nombre total de composants présents plus d'une fois : {len(element_freq_sup_1_df)}")
-    display(element_freq_sup_1_df.head(15))
+    print(f"dont les {n_p} premiers :")
+    display(element_freq_sup_1_df.head(n_p))
 
 
 def composition_distribution(
@@ -161,6 +167,7 @@ def composition_distribution(
     # Afficher la distribution du taux de fréquence du nombre de composants
     component_distribution = num_components.value_counts().sort_index()
     component_distribution_rate = component_distribution / len(serie) * 100
+    print(title + " (en valeur) :")
     display(component_distribution.to_frame())
 
     # Afficher la distribution sous forme d'un histogramme
@@ -170,6 +177,6 @@ def composition_distribution(
         plt.text(i, component_distribution_rate.values[i] + 0.5, f'{component_distribution_rate.values[i]:.3f}%', ha='center')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.title(title)
+    plt.title(title + " (en %)")
     #plt.xticks(rotation=90)
     plt.show()

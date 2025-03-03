@@ -3,7 +3,21 @@ import torch
 
 __version__ = "1.0.1"
 
-def print_colore(text: str, values: list[float], text_color: str = "white", bck_color: int = 0, font_size: int|str = "18px") -> None:
+def get_torch_optimal_device(verbose: bool = True) -> str:
+    """
+    """
+    device = (
+        "cuda" if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available()
+        else "cpu"
+    )
+
+    print(f"Using {device} device")
+
+    return device
+
+
+def print_color(text: str, values: list[float], text_color: str = "white", bck_color: int = 0, font_size: int|str = "18px") -> None:
     """
     Display a background-colored text regardind values (of intensity) of each char.
 
@@ -35,13 +49,19 @@ def print_colore(text: str, values: list[float], text_color: str = "white", bck_
     display(HTML(all_html_text))
 
 
-def get_torch_optimal_device(verbose: bool = True) -> str:
-    device = (
-        "cuda" if torch.cuda.is_available()
-        else "mps" if torch.backends.mps.is_available()
-        else "cpu"
-    )
+def update_top_k(top_values, top_indices, new_values, new_indices, k=20):
+    """
+    """
+    combined_values = torch.cat([top_values, new_values])
+    combined_indices = torch.cat([top_indices, new_indices])
+    
+    new_top_values, topk_indices = torch.topk(combined_values, k)
+    new_top_indices = combined_indices[topk_indices]
+    
+    return new_top_values, new_top_indices
 
-    print(f"Using {device} device")
-
-    return device
+def clean_memory(device):
+    if device == "mps":
+        torch.mps.empty_cache()
+    elif device == "cuda":
+        torch.cuda.empty_cache()

@@ -4,7 +4,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-__version__ = "1.0.0"
+from .dataset import SOS, EOS, CharTokenizer
+
+__version__ = "1.1.1"
 
 @dataclass
 class TransformerConfig:
@@ -22,7 +24,8 @@ class TransformerConfig:
     flash: bool = True
 
     def __post_init__(self):
-        assert self.d_model % self.n_heads == 0, "d_model must be a multiple of n_heads"
+        assert self.d_model % self.n_heads == 0, \
+            f"d_model ({self.d_model}) must be a multiple of n_heads ({self.n_heads})"
 
         self.d_head = self.d_model // self.n_heads
 
@@ -82,14 +85,14 @@ class SelfAttentionMultiHead(nn.Module):
         self.c_proj = nn.Linear(config.d_model, config.d_model, bias=config.bias)
 
         # regularization
-        self.attn_drop = nn.Dropout(config.dropout)
+        self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
+        Args :
+            x (torch.Tensor) : input shaped (B, S, d_model)
         """
-        # x : (B, S, d_model)
-
         B, S, _ = x.size()
 
         Q = self.query_proj(x).view(B, S, self.config.n_heads, self.config.d_head).transpose(1, 2) # (B, n_heads, S, d_query)
@@ -107,9 +110,9 @@ class SelfAttentionMultiHead(nn.Module):
             attention_scores = torch.softmax(QK_T / math.sqrt(self.config.d_head), dim=3) # (B, n_heads, S, S)
 
             if self.config.super_attn:
-                attention = self.attn_drop(attention_scores) @ self.k_in_v_proj.weight @ V # (B, n_h, L, d_value=d_head)
+                attention = self.attn_dropout(attention_scores) @ self.k_in_v_proj.weight @ V # (B, n_h, L, d_value=d_head)
             else:
-                attention = self.attn_drop(attention_scores) @ V # (B, n_h, S, d_value=d_head)
+                attention = self.attn_dropout(attention_scores) @ V # (B, n_h, S, d_value=d_head)
 
         attention = attention.transpose(1, 2) # (B, S, n_heafs, d_head)
         y = attention.contiguous().view(B, S, self.config.d_model) # n_heads * d_head = d_model
@@ -180,12 +183,18 @@ class Transformer(nn.Module):
         self.in_dropout = nn.Dropout(config.dropout)
         self.layers = nn.ModuleList([DecoderLayer(config) for _ in range(config.n_layers)])
 
-    def forward(self, x: torch.Tensor, stop_at_layer: int = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, stop_at_layer: int = -1) -> torch.Tensor:
         """
         Args :
             x (torch.Tensor) : input data shaped (B, S, d_model)
             stop_at_layer (int) : return the ouput (activations) after the specified {layer}-th layer (1 -> n_layers)
         """
+        if stop_at_layer < 0:
+            stop_at_layer += len(self.layers) + 1
+        elif stop_at_layer == 0:
+            stop_at_layer = 1
+        assert stop_at_layer <= len(self.layers), \
+            f"stop_at_layer ({stop_at_layer}) should be in [{-len(self.layers)}, {len(self.layers)}]"
         _, S, _ = x.size()
 
         # Add positional embedding
@@ -214,7 +223,7 @@ class LanguageModel(nn.Module):
         self.lm_head.weight = self.embedding.weight
 
         self.apply(self._init_weights)
-        self.apply(self._init_normal)
+        self._init_normal()
 
     def _init_weights(self, module):
         # taken from llama2.c
@@ -225,11 +234,11 @@ class LanguageModel(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def _init_normal(self, module):
+    def _init_normal(self):
         for pn, p in self.named_parameters():
             if pn.endswith('fc_3.weight') or pn.endswith('c_proj.weight'):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * self.config.n_layers))
-  
+    
     def get_logits_(self, x: torch.Tensor) -> torch.Tensor:
         x = self.out_norm(x)
         return self.lm_head(x)
@@ -243,21 +252,20 @@ class LanguageModel(nn.Module):
         x = self.core(x)
         logits = self.get_logits_(x)
 
-        return logits #(B, S, vocab_size)
+        return logits #(B, S, vocab_size)  
 
 
 class LanguageModelForSAE(LanguageModel):
     def __init__(self, model_config: TransformerConfig) -> None:
         super().__init__(model_config)
 
-    def forward(self, tokens: torch.Tensor, act: bool = False, stop_at_layer: int = None) -> torch.Tensor:
+    def forward(self, tokens: torch.Tensor, act: bool = False, stop_at_layer: int = -1) -> torch.Tensor:
         """
         Args :
-            tokens (torch.Tensor) : input shaped (B, s, vocab_size) with s in [1; S]
+            - tokens (torch.Tensor) : input shaped (B, s, vocab_size) with s in [1; S]
+            - act (bool) : return hidden activations if True
+            - stop_at_layer (int) : the indice of the DecoderLayer module to take output
         """
-
-        act = act or (stop_at_layer != None)
-
         x = self.embedding(tokens)
         x = self.core(x, stop_at_layer=stop_at_layer)
 
@@ -269,7 +277,7 @@ class LanguageModelForSAE(LanguageModel):
         return logits #(B, S, vocab_size)
 
 
-def load_transformer_model(filename: str, config: TransformerConfig, device="cpu", verbose: bool =True, class_model=LanguageModel):
+def load_transformer_model(filename: str, config: TransformerConfig, device="cpu", verbose: bool = True, class_model=LanguageModel):
     model = class_model(config)
     model.load_state_dict(
         torch.load(filename, map_location=torch.device('cpu'), weights_only=True)
@@ -277,3 +285,28 @@ def load_transformer_model(filename: str, config: TransformerConfig, device="cpu
     if verbose:
         print(model)
     return model.to(device)
+
+
+def sample(model: LanguageModel, tokenizer: CharTokenizer, prompt: str = "", device="cpu", g = None) -> str:
+    idx = torch.tensor(
+        [tokenizer.char_to_int[SOS]] + tokenizer(prompt),
+        dtype=torch.int32,
+        device=device
+        ).unsqueeze(0)
+    
+    next_id = -1
+
+    while next_id != tokenizer.char_to_int[EOS]:
+        logits = model(idx) # (1, len_s, d_model)
+
+        # calcul des probas pour chaque élément du vocabulaire
+        probs = F.softmax(logits[:, -1, :], dim=-1)
+        # tirage au sort en prenant en compte ces probas
+        next_id = torch.multinomial(probs, num_samples=1, generator=g).item()
+        # concaténation
+        idx = torch.cat([idx, torch.tensor(next_id, device=device).view(1, 1)], dim=1)
+
+        if idx.shape[1] > model.config.max_len:
+            break
+    
+    return tokenizer.to_string(idx[0].tolist())
