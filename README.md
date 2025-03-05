@@ -56,5 +56,6 @@ L'organisation des fichiers :
 
 
 > Créé en adaptant et complétant le projet [Générer des noms de villes et communes françaises](https://github.com/alxndrTL/villes) par [Alexandre TL](https://www.youtube.com/@alexandretl).
+>
 > Inspiré des matériels créés pour le programme de formation technique [ARENA](https://github.com/callummcdougall/ARENA_3.0)
 
