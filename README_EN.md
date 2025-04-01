@@ -4,7 +4,7 @@
 
 Materials and resources created for the workshop organised by [Automatants](https://automatants.cs-campus.fr/) and [CeSIA](https://www.securite-ia.fr/) on March 6th 2025, which follows on from the training offered by Automatants and the conference of January 16th 2025 ‘[LLMs and Interpretability](https://lu.ma/rkkiifsz?tk=QVb9uc)’.
 
-The aim of this tutorial is to manipulate some concepts of *[Mechanistic](https://www.neelnanda.io/mechanistic-interpretability/glossary) [Interpretability](https://arxiv.org/abs/2404.14082)* (*Mech Interp*), in particular from the perspective of [AI safety](https://ai-safety-atlas.com/chapters/09/).
+The aim of this tutorial is to manipulate some concepts of *[Mechanistic](https://www.neelnanda.io/mechanistic-interpretability/glossary) [Interpretability](https://leonardbereska.github.io/blog/2024/mechinterpreview/)* (*Mech Interp*), in particular from the perspective of [AI safety](https://ai-safety-atlas.com/chapters/09/).
 
 We'll try to interpret certain neurons in a ‘toy’ language model based on Transformer, that was trained to generate the names of French cities, using [sparse auto-encoders](https://transformer-circuits.pub/2023/monosemantic-features/index.html).
 
@@ -51,7 +51,7 @@ Organisation of the files :
 - `./workshop_part_*.ipynb`: notebooks containing the statements;
 - `./workshop_part*__solutions.ipynb`: notebooks containing solutions,
 - `./utils/`: some files in the `utils` directory contain the factorisation of codes presented in the notebooks, for reuse in the following parts (for example, the codes for calculating the statistics on the dataset);
-- `./weights/`: weights generated during the workshop, and ‘solution’ weights;
+- `./weights/`: weights generated during the workshop, and ‘solution’ weights in the subdirectory `./weights/solutions/`;
 - `./villes.txt`: this file contains the dataset of 36583 names of French cities (source: [Générer des noms de villes et communes françaises](https://github.com/alxndrTL/villes)).
 
 
